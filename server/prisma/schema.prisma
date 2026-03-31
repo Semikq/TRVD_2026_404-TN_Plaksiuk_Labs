@@ -1,0 +1,194 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  firstName String
+  lastName  String
+  phone     String?
+  role      UserRole @default(CLIENT)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  orders  Order[]
+  reviews Review[]
+  addresses Address[]
+
+  @@map("users")
+}
+
+model Address {
+  id       String @id @default(cuid())
+  street   String
+  city     String
+  zipCode  String
+  isDefault Boolean @default(false)
+  
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders Order[]
+
+  @@map("addresses")
+}
+
+model Category {
+  id          String @id @default(cuid())
+  name        String @unique
+  description String?
+  imageUrl    String?
+  
+  products Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  id          String  @id @default(cuid())
+  name        String
+  description String
+  price       Decimal @db.Decimal(10, 2)
+  imageUrl    String?
+  isAvailable Boolean @default(true)
+  weight      Int     // in grams
+  
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
+  
+  // Relations
+  orderItems OrderItem[]
+  reviews    Review[]
+
+  @@map("products")
+}
+
+model Order {
+  id            String      @id @default(cuid())
+  orderNumber   String      @unique
+  status        OrderStatus @default(PENDING)
+  totalAmount   Decimal     @db.Decimal(10, 2)
+  deliveryType  DeliveryType
+  deliveryFee   Decimal?    @db.Decimal(10, 2)
+  promoCode     String?
+  discount      Decimal?    @db.Decimal(10, 2)
+  notes         String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  
+  userId    String
+  user      User    @relation(fields: [userId], references: [id])
+  
+  addressId String?
+  address   Address? @relation(fields: [addressId], references: [id])
+  
+  // Relations
+  orderItems OrderItem[]
+  payment    Payment?
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id       String @id @default(cuid())
+  quantity Int
+  price    Decimal @db.Decimal(10, 2)
+  
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  @@map("order_items")
+}
+
+model Payment {
+  id            String        @id @default(cuid())
+  amount        Decimal       @db.Decimal(10, 2)
+  status        PaymentStatus @default(PENDING)
+  paymentMethod String
+  transactionId String?
+  createdAt     DateTime      @default(now())
+  
+  orderId String @unique
+  order   Order  @relation(fields: [orderId], references: [id])
+
+  @@map("payments")
+}
+
+model PromoCode {
+  id          String           @id @default(cuid())
+  code        String           @unique
+  description String?
+  discountType DiscountType
+  discountValue Decimal        @db.Decimal(10, 2)
+  minOrderAmount Decimal?      @db.Decimal(10, 2)
+  maxUses     Int?
+  usedCount   Int              @default(0)
+  isActive    Boolean          @default(true)
+  validFrom   DateTime
+  validUntil  DateTime
+  createdAt   DateTime         @default(now())
+
+  @@map("promo_codes")
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  rating    Int      // 1-5 stars
+  comment   String?
+  createdAt DateTime @default(now())
+  
+  userId    String
+  user      User    @relation(fields: [userId], references: [id])
+  
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  @@unique([userId, productId])
+  @@map("reviews")
+}
+
+enum UserRole {
+  CLIENT
+  ADMIN
+  MANAGER
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  READY_FOR_PICKUP
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+}
+
+enum DeliveryType {
+  PICKUP
+  DELIVERY
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED_AMOUNT
+}
